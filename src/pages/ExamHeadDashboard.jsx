@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { Bell, Calendar, PlusCircle, CheckCircle } from 'lucide-react';
+import { Bell, Calendar, PlusCircle, CheckCircle, Trash2 } from 'lucide-react';
 
 const ExamHeadDashboard = () => {
     const [notifications, setNotifications] = useState([]);
@@ -55,6 +55,18 @@ const ExamHeadDashboard = () => {
         } catch (error) {
             toast.error('Failed to update notification');
             console.error(error);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        if (window.confirm('Are you sure you want to delete this notification? This action cannot be undone.')) {
+            try {
+                await api.delete(`/admin/notifications/${id}`);
+                toast.success('Notification Deleted');
+                setNotifications(prev => prev.filter(n => n._id !== id));
+            } catch (error) {
+                toast.error('Failed to delete notification');
+            }
         }
     };
 
@@ -262,7 +274,15 @@ const ExamHeadDashboard = () => {
                                         {notif.description}
                                     </p>
                                 )}
-                                <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end">
+                                <div className="mt-4 pt-3 border-t border-gray-100 flex justify-end space-x-4">
+                                    <button
+                                        onClick={() => handleDelete(notif._id)}
+                                        className="text-red-500 hover:text-red-700 flex items-center text-sm font-medium"
+                                        title="Delete Notification"
+                                    >
+                                        <Trash2 className="h-4 w-4 mr-1" />
+                                        Delete
+                                    </button>
                                     <button
                                         onClick={() => setEditModalData(notif)}
                                         className="text-sm font-medium text-indigo-600 hover:text-indigo-800"

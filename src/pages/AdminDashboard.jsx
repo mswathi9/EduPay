@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { Search, Settings, DollarSign } from 'lucide-react';
+import { Search, Settings, DollarSign, Users } from 'lucide-react';
 
 const AdminDashboard = () => {
     const [activeTab, setActiveTab] = useState('search');
@@ -14,20 +14,9 @@ const AdminDashboard = () => {
         amount: ''
     });
 
-    const handleConfigureFee = async (e) => {
-        e.preventDefault();
-        try {
-            await api.post('/admin/config/gov-fee', {
-                quota: configData.quota,
-                currentYear: parseInt(configData.currentYear),
-                amount: configData.amount,
-                usn: configData.usn
-            });
-            toast.success(configData.quota === 'government' ? 'Bulk Fee Assigned Successfully' : 'Student Fee Assigned Successfully');
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to update fee');
-        }
-    };
+    // Promotion Logic
+    const [promotionYear, setPromotionYear] = useState(1);
+    const [classStudents, setClassStudents] = useState([]);
 
     const handleSearchStudent = async (e) => {
         e.preventDefault();
@@ -43,10 +32,75 @@ const AdminDashboard = () => {
     const handleUpdateStudentFees = async (usn, updates) => {
         try {
             const { data } = await api.put(`/admin/students/${usn}/fees`, updates);
-            setSearchedStudent(data); // Update local state with latest data
-            toast.success('Student Fees Updated');
+            toast.success('Fees Updated');
+            setSearchedStudent(data);
         } catch (error) {
-            toast.error('Failed to update fees');
+            toast.error('Update Failed');
+        }
+    };
+
+    const handleConfigureFee = async (e) => {
+        e.preventDefault();
+        try {
+            if (configData.quota === 'government') {
+                if (!configData.currentYear) return toast.error('Select Year');
+                await api.post('/admin/config/gov-fee', {
+                    year: configData.currentYear,
+                    amount: configData.amount
+                });
+                toast.success(`Government Fees updated for Year ${configData.currentYear}`);
+            } else {
+                if (!configData.usn) return toast.error('Enter USN');
+                await api.put(`/admin/students/${configData.usn}/fees`, {
+                    collegeFeeDue: configData.amount,
+                    annualCollegeFee: configData.amount
+                });
+                toast.success('Management Fee Assigned');
+            }
+            setConfigData({ ...configData, amount: '' });
+        } catch (error) {
+            toast.error('Configuration Failed');
+        }
+    };
+
+    const handleFetchClass = async () => {
+        try {
+            const { data } = await api.get(`/admin/students/year/${promotionYear}`);
+            setClassStudents(data);
+            if (data.length === 0) toast('No students found in this year', { icon: 'ℹ️' });
+        } catch (error) {
+            toast.error('Failed to fetch class list');
+        }
+    };
+
+    const handlePromoteBatch = async () => {
+        // Calculate eligible students
+        const eligibleStudents = classStudents.filter(student => {
+            const totalDue = (student.collegeFeeDue || 0) +
+                (student.transportFeeDue || 0) +
+                (student.hostelFeeDue || 0) +
+                (student.placementFeeDue || 0);
+            return totalDue <= 0;
+        });
+
+        const eligibleCount = eligibleStudents.length;
+
+        if (eligibleCount === 0) {
+            return toast.error('No eligible students to promote. Clear dues first.');
+        }
+
+        const confirmMsg = promotionYear === 4
+            ? `Are you sure you want to GRADUATE ${eligibleCount} ELIGIBLE students from Year 4? \n\n(${classStudents.length - eligibleCount} students with pending dues will be SKIPPED)`
+            : `Are you sure you want to PROMOTE ${eligibleCount} ELIGIBLE students from Year ${promotionYear} to Year ${promotionYear + 1}? \n\n(${classStudents.length - eligibleCount} students with pending dues will be SKIPPED)`;
+
+        if (!confirm(confirmMsg)) return;
+
+        try {
+            const { data } = await api.post('/admin/students/promote', { currentYear: promotionYear });
+            toast.success(data.message);
+            handleFetchClass(); // Refresh list (should be empty now)
+        } catch (error) {
+            toast.error(error.response?.data?.message || 'Promotion Failed');
         }
     };
 
@@ -59,6 +113,7 @@ const AdminDashboard = () => {
                 {[
                     { id: 'search', label: 'Search & Edit', icon: Search },
                     { id: 'fees', label: 'Fee Config', icon: Settings },
+                    { id: 'promotion', label: 'Class Management', icon: Users }, // Reusing Users icon for now
                 ].map((tab) => (
                     <button
                         key={tab.id}
@@ -147,6 +202,7 @@ const AdminDashboard = () => {
                                     <div>
                                         <h4 className="text-sm font-bold text-orange-900 uppercase tracking-wider">Transport Fee Due</h4>
                                         <p className="text-2xl font-bold text-orange-700 mt-1">₹{searchedStudent.transportFeeDue}</p>
+                                        {searchedStudent.transportRoute && <p className="text-xs text-orange-600 mt-1 font-medium bg-orange-100 px-2 py-0.5 rounded inline-block">{searchedStudent.transportRoute}</p>}
                                     </div>
                                     {searchedStudent.transportFeeDue > 0 ? (
                                         <div className="flex space-x-2">
@@ -165,6 +221,76 @@ const AdminDashboard = () => {
                                                     const newDue = prompt(`Update Transport Fee Due (Current: ₹${searchedStudent.transportFeeDue}):`, searchedStudent.transportFeeDue);
                                                     if (newDue !== null) {
                                                         handleUpdateStudentFees(searchedStudent.usn, { transportFeeDue: parseInt(newDue) });
+                                                    }
+                                                }}
+                                                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg shadow-sm hover:bg-gray-300 text-sm font-medium"
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <span className="px-3 py-1 bg-green-200 text-green-800 rounded-lg text-sm font-bold">Paid / No Due</span>
+                                    )}
+                                </div>
+
+                                {/* Hostel Fee Box */}
+                                <div className="bg-rose-50 p-5 rounded-xl border border-rose-100 flex justify-between items-center">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-rose-900 uppercase tracking-wider">Hostel Fee Due</h4>
+                                        <p className="text-2xl font-bold text-rose-700 mt-1">₹{searchedStudent.hostelFeeDue}</p>
+                                    </div>
+                                    {searchedStudent.hostelFeeDue > 0 ? (
+                                        <div className="flex space-x-2">
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm('Are you sure you want to mark Hostel Fee as PAID?')) {
+                                                        handleUpdateStudentFees(searchedStudent.usn, { hostelFeeDue: 0 });
+                                                    }
+                                                }}
+                                                className="px-3 py-2 bg-green-600 text-white rounded-lg shadow-sm hover:bg-green-700 text-sm font-bold flex items-center"
+                                            >
+                                                Mark Paid
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const newDue = prompt(`Update Hostel Fee Due (Current: ₹${searchedStudent.hostelFeeDue}):`, searchedStudent.hostelFeeDue);
+                                                    if (newDue !== null) {
+                                                        handleUpdateStudentFees(searchedStudent.usn, { hostelFeeDue: parseInt(newDue) });
+                                                    }
+                                                }}
+                                                className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg shadow-sm hover:bg-gray-300 text-sm font-medium"
+                                            >
+                                                Edit
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <span className="px-3 py-1 bg-green-200 text-green-800 rounded-lg text-sm font-bold">Paid / No Due</span>
+                                    )}
+                                </div>
+
+                                {/* Placement Fee Box */}
+                                <div className="bg-blue-50 p-5 rounded-xl border border-blue-100 flex justify-between items-center">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-blue-900 uppercase tracking-wider">Placement Fee Due</h4>
+                                        <p className="text-2xl font-bold text-blue-700 mt-1">₹{searchedStudent.placementFeeDue}</p>
+                                    </div>
+                                    {searchedStudent.placementFeeDue > 0 ? (
+                                        <div className="flex space-x-2">
+                                            <button
+                                                onClick={() => {
+                                                    if (confirm('Are you sure you want to mark Placement Fee as PAID?')) {
+                                                        handleUpdateStudentFees(searchedStudent.usn, { placementFeeDue: 0 });
+                                                    }
+                                                }}
+                                                className="px-3 py-2 bg-green-600 text-white rounded-lg shadow-sm hover:bg-green-700 text-sm font-bold flex items-center"
+                                            >
+                                                Mark Paid
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    const newDue = prompt(`Update Placement Fee Due (Current: ₹${searchedStudent.placementFeeDue}):`, searchedStudent.placementFeeDue);
+                                                    if (newDue !== null) {
+                                                        handleUpdateStudentFees(searchedStudent.usn, { placementFeeDue: parseInt(newDue) });
                                                     }
                                                 }}
                                                 className="px-3 py-2 bg-gray-200 text-gray-700 rounded-lg shadow-sm hover:bg-gray-300 text-sm font-medium"
@@ -338,6 +464,101 @@ const AdminDashboard = () => {
                             }
                         </p>
                     </div>
+                </div>
+            )}
+
+            {/* 4. CLASS MANAGEMENT (Promotion) */}
+            {activeTab === 'promotion' && (
+                <div className="bg-white p-8 rounded-xl shadow-md max-w-5xl">
+                    <h2 className="text-xl font-bold mb-6 flex items-center">
+                        <Users className="mr-2 h-6 w-6 text-gray-600" />
+                        Class Promotion Management
+                    </h2>
+
+                    <div className="flex gap-4 items-end mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Select Year to Promote</label>
+                            <select
+                                className="w-48 p-2 border rounded-lg"
+                                value={promotionYear}
+                                onChange={(e) => setPromotionYear(parseInt(e.target.value))}
+                            >
+                                <option value={1}>Year 1</option>
+                                <option value={2}>Year 2</option>
+                                <option value={3}>Year 3</option>
+                                <option value={4}>Year 4 (Graduate)</option>
+                            </select>
+                        </div>
+                        <button
+                            onClick={handleFetchClass}
+                            className="px-6 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-bold border border-gray-300"
+                        >
+                            Fetch Students
+                        </button>
+                    </div>
+
+                    {classStudents.length > 0 && (
+                        <div className="border border-gray-200 rounded-lg overflow-hidden">
+                            <div className="bg-gray-50 px-6 py-4 flex justify-between items-center border-b border-gray-200">
+                                <h3 className="font-bold text-gray-700">Year {promotionYear} - Active Students ({classStudents.length})</h3>
+                                <button
+                                    onClick={handlePromoteBatch}
+                                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-bold shadow-md animate-pulse"
+                                >
+                                    {(() => {
+                                        const eligibleCount = classStudents.filter(s => ((s.collegeFeeDue || 0) + (s.transportFeeDue || 0) + (s.hostelFeeDue || 0) + (s.placementFeeDue || 0)) <= 0).length;
+                                        return promotionYear === 4
+                                            ? `Graduate ${eligibleCount} Eligible Candidates`
+                                            : `Promote ${eligibleCount} Eligible Candidates`;
+                                    })()}
+                                </button>
+                            </div>
+                            <div className="overflow-x-auto max-h-96 overflow-y-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                    <thead className="bg-gray-50 sticky top-0 z-10">
+                                        <tr>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">USN</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quota</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Total Due</th>
+                                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white divide-y divide-gray-200">
+                                        {classStudents.map(student => {
+                                            const totalDue = (student.collegeFeeDue || 0) +
+                                                (student.transportFeeDue || 0) +
+                                                (student.hostelFeeDue || 0) +
+                                                (student.placementFeeDue || 0);
+                                            const isEligible = totalDue <= 0;
+
+                                            return (
+                                                <tr key={student._id} className={!isEligible ? 'bg-red-50' : ''}>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.usn}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.user?.name}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.department}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 capitalize">{student.quota}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">₹{totalDue.toLocaleString()}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        {isEligible ? (
+                                                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                                                                Eligible
+                                                            </span>
+                                                        ) : (
+                                                            <span className="px-2 inline-flex text-xs leading-5 font-bold rounded-full bg-red-100 text-red-800 animate-pulse">
+                                                                Dues Pending
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

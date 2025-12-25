@@ -13,6 +13,7 @@ import RegistrarDashboard from './pages/RegistrarDashboard';
 import LibrarianDashboard from './pages/LibrarianDashboard';
 import PlacementDashboard from './pages/PlacementDashboard';
 import HostelDashboard from './pages/HostelDashboard';
+import AdmissionDashboard from './pages/AdmissionDashboard'; // Added
 
 function App() {
   return (
@@ -93,6 +94,16 @@ function App() {
               }
             />
 
+            {/* Admission Routes */}
+            <Route
+              path="/admission/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['admission_officer', 'admin']}>
+                  <AdmissionDashboard />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Placement Routes */}
             <Route
               path="/placement/dashboard"
@@ -107,7 +118,7 @@ function App() {
             <Route
               path="/hostel/dashboard"
               element={
-                <ProtectedRoute allowedRoles={['hostel_warden', 'admin']}>
+                <ProtectedRoute allowedRoles={['hostel_manager', 'admin']}>
                   <HostelDashboard />
                 </ProtectedRoute>
               }

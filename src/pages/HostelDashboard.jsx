@@ -1,178 +1,169 @@
 import { useState } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { Search, Home, DollarSign, Ban, UserCheck } from 'lucide-react';
+import { Home, Search, UserCheck, DollarSign, CheckCircle } from 'lucide-react';
 
 const HostelDashboard = () => {
-    const [searchUsn, setSearchUsn] = useState('');
-    const [student, setStudent] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchedStudent, setSearchedStudent] = useState(null);
 
-    // Fee Actions
-    const [assignAmount, setAssignAmount] = useState('');
-    const [payAmount, setPayAmount] = useState('');
-
-    const handleSearch = async (e) => {
+    const handleSearchStudent = async (e) => {
         e.preventDefault();
-        setLoading(true);
-        setStudent(null);
-        setAssignAmount('');
-        setPayAmount('');
-
         try {
-            const { data } = await api.get(`/hostel/student/${searchUsn}`);
-            setStudent(data);
+            const { data } = await api.get(`/hostel/students/search?query=${searchTerm}`);
+            setSearchedStudent(data);
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Student search failed');
-        } finally {
-            setLoading(false);
+            toast.error('Student not found');
+            setSearchedStudent(null);
         }
     };
 
-    const handleAssignFee = async (e) => {
-        e.preventDefault();
-        if (!assignAmount) return;
-
+    const handleUpdate = async (updates) => {
         try {
-            await api.post('/hostel/fees/assign', {
-                usn: student.usn,
-                amount: assignAmount
-            });
-            toast.success('Hostel Fee Assigned');
-            setAssignAmount('');
-            handleSearch({ preventDefault: () => { } }); // Refresh
+            const { data } = await api.put(`/hostel/students/${searchedStudent.usn}`, updates);
+            setSearchedStudent(data);
+            toast.success('Hostel Details Updated');
         } catch (error) {
-            toast.error('Failed to assign fee');
-        }
-    };
-
-    const handlePayFee = async (e) => {
-        e.preventDefault();
-        if (!payAmount) return;
-
-        try {
-            await api.post('/hostel/fees/pay', {
-                usn: student.usn,
-                amount: payAmount
-            });
-            toast.success('Payment Recorded Successfully');
-            setPayAmount('');
-            handleSearch({ preventDefault: () => { } }); // Refresh
-        } catch (error) {
-            toast.error('Payment Record Failed');
-        }
-    };
-
-    const handleDisableHostel = async () => {
-        if (!window.confirm(`Are you sure you want to disable hostel for ${student.usn}?`)) return;
-
-        try {
-            await api.post('/hostel/disable', { usn: student.usn });
-            toast.success('Hostel Access Disabled');
-            handleSearch({ preventDefault: () => { } });
-        } catch (error) {
-            toast.error('Failed to disable hostel');
+            toast.error('Update Failed');
         }
     };
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-            <h1 className="text-3xl font-serif font-bold text-gray-900 flex items-center">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-8 flex items-center">
                 <Home className="mr-3 h-8 w-8 text-indigo-600" />
-                Hostel Administration
+                Hostel Manager Dashboard
             </h1>
 
             {/* Search Section */}
-            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                <form onSubmit={handleSearch} className="flex gap-4">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-                        <input
-                            type="text"
-                            placeholder="Enter Student USN to Manage"
-                            value={searchUsn}
-                            onChange={(e) => setSearchUsn(e.target.value.toUpperCase())}
-                            className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none uppercase font-medium"
-                        />
-                    </div>
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="bg-indigo-600 text-white px-8 py-3 rounded-lg font-bold hover:bg-indigo-700 transition-colors disabled:opacity-50"
-                    >
-                        {loading ? 'Searching...' : 'Search'}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 max-w-2xl mb-8">
+                <form onSubmit={handleSearchStudent} className="flex gap-4">
+                    <input
+                        type="text"
+                        placeholder="Enter Student USN / Roll Number"
+                        className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center">
+                        <Search className="w-4 h-4 mr-2" /> Search
                     </button>
                 </form>
             </div>
 
-            {/* Student Details & Actions */}
-            {student && (
-                <div className="bg-white rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <div className="bg-gray-50 px-8 py-6 border-b border-gray-200 flex justify-between items-center">
+            {/* Student Details Section */}
+            {searchedStudent && (
+                <div className="bg-white rounded-xl shadow-md overflow-hidden max-w-4xl border border-gray-200">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
                         <div>
-                            <h2 className="text-2xl font-bold text-gray-800">{student.usn}</h2>
-                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wide mt-2 ${student.hostelOpted ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                {student.hostelOpted ? <UserCheck className="w-3 h-3 mr-1" /> : <Ban className="w-3 h-3 mr-1" />}
-                                {student.hostelOpted ? 'Hostel Active' : 'Hostel Disabled'}
-                            </span>
+                            <h3 className="text-lg font-bold text-gray-800">{searchedStudent.usn}</h3>
+                            <p className="text-gray-500 text-sm">{searchedStudent.user?.name}</p>
                         </div>
-                        {student.hostelOpted && (
-                            <button
-                                onClick={handleDisableHostel}
-                                className="px-4 py-2 bg-red-50 text-red-600 border border-red-200 rounded-lg font-bold text-sm hover:bg-red-100 transition-colors flex items-center"
-                            >
-                                <Ban className="w-4 h-4 mr-2" />
-                                Disable Access
-                            </button>
-                        )}
+                        <div className="flex items-center space-x-4">
+                            <span className="text-sm text-gray-500">Dept: {searchedStudent.department}</span>
+                        </div>
                     </div>
 
-                    <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10">
-                        {/* Assign Fee */}
-                        <div className="space-y-4">
-                            <h3 className="font-bold text-gray-600 uppercase tracking-widest text-xs border-b pb-2 mb-4">Assign New Fee</h3>
-                            <form onSubmit={handleAssignFee} className="space-y-4">
+                    <div className="p-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            {/* 1. Facilitiy Toggle */}
+                            <div className="p-6 bg-indigo-50 rounded-xl border border-indigo-100 flex flex-col justify-between">
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Fee Amount (₹)</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        min="1"
-                                        value={assignAmount}
-                                        onChange={e => setAssignAmount(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                                        placeholder="e.g. 75000"
-                                    />
+                                    <h4 className="text-lg font-bold text-indigo-900 mb-2 flex items-center">
+                                        <UserCheck className="w-5 h-5 mr-2" />
+                                        Hostel Facility
+                                    </h4>
+                                    <p className="text-indigo-700 text-sm mb-4">
+                                        Current Status: <span className="font-bold">{searchedStudent.hostelOpted ? 'ENABLED' : 'DISABLED'}</span>
+                                    </p>
                                 </div>
-                                <button type="submit" className="w-full py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 shadow-sm">
-                                    Assign Fee
-                                </button>
-                            </form>
-                        </div>
+                            </div>
 
-                        {/* Collect Payment */}
-                        <div className="space-y-4 border-l pl-0 md:pl-10 border-gray-100">
-                            <h3 className="font-bold text-gray-600 uppercase tracking-widest text-xs border-b pb-2 mb-4 flex justify-between">
-                                Collect Payment
-                                <span className="text-red-500">Due: ₹{student.hostelFeeDue?.toLocaleString() || 0}</span>
-                            </h3>
-                            <form onSubmit={handlePayFee} className="space-y-4">
+                            {/* 2. Fee Management */}
+                            <div className={`p-6 rounded-xl border flex flex-col justify-between ${searchedStudent.hostelOpted ? 'bg-white border-gray-200' : 'bg-gray-100 border-gray-200 opacity-75'}`}>
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Amount (₹)</label>
-                                    <input
-                                        type="number"
-                                        required
-                                        min="1"
-                                        value={payAmount}
-                                        onChange={e => setPayAmount(e.target.value)}
-                                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none"
-                                        placeholder="Enter amount"
-                                    />
+                                    <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                                        <DollarSign className="w-5 h-5 mr-2" />
+                                        Fee Management
+                                    </h4>
+
+                                    {searchedStudent.hostelOpted ? (
+                                        <div className="space-y-4">
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500 mb-1">Current Hostel Fee Due</p>
+                                                <p className="text-2xl font-bold text-gray-900">₹{searchedStudent.hostelFeeDue}</p>
+                                            </div>
+
+                                            {searchedStudent.hostelFeeDue > 0 ? (
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm(`Mark ₹${searchedStudent.hostelFeeDue} as PAID?`)) {
+                                                            handleUpdate({ hostelFeeDue: 0 });
+                                                        }
+                                                    }}
+                                                    className="w-full py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition shadow-sm flex justify-center items-center"
+                                                >
+                                                    <DollarSign className="w-5 h-5 mr-2" />
+                                                    Mark Full Year Paid
+                                                </button>
+                                            ) : (
+                                                <div className="w-full py-3 bg-green-100 text-green-800 font-bold rounded-lg flex justify-center items-center">
+                                                    <CheckCircle className="w-5 h-5 mr-2" />
+                                                    Full Year Paid
+                                                </div>
+                                            )}
+
+                                            {/* Semester Wise Breakdown */}
+                                            <div className="mt-6 border-t border-gray-200 pt-4">
+                                                <h5 className="font-semibold text-gray-700 mb-2">Semester Breakdown</h5>
+                                                <div className="space-y-3">
+                                                    {searchedStudent.feeRecords && searchedStudent.feeRecords
+                                                        .filter(r => r.feeType === 'hostel')
+                                                        .sort((a, b) => a.year - b.year || a.semester - b.semester)
+                                                        .map((record, index) => (
+                                                            <div key={index} className="flex flex-col bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                                                <div className="flex justify-between items-center mb-1">
+                                                                    <span className="text-sm font-medium text-gray-600">Year {record.year} - Sem {record.semester}</span>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${record.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                            {record.status.toUpperCase()}
+                                                                        </span>
+                                                                        {record.status !== 'paid' && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    if (window.confirm(`Mark Semester ${record.semester} Hostel Fee (₹${record.amountDue}) as PAID?`)) {
+                                                                                        handleUpdate({ markSemPaid: record.semester });
+                                                                                    }
+                                                                                }}
+                                                                                className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 transition font-semibold"
+                                                                            >
+                                                                                Mark Paid
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex justify-between text-xs text-gray-500">
+                                                                    <span>Due: ₹{record.amountDue}</span>
+                                                                    <span>Paid: ₹{record.amountPaid}</span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                                                                    <div
+                                                                        className={`h-1 rounded-full ${record.status === 'paid' ? 'bg-green-500' : 'bg-indigo-500'}`}
+                                                                        style={{ width: `${Math.min(100, (record.amountPaid / record.amountDue) * 100)}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 text-gray-500">
+                                            Hostel Facility not opted.
+                                        </div>
+                                    )}
                                 </div>
-                                <button type="submit" className="w-full py-2 bg-emerald-600 text-white font-bold rounded-lg hover:bg-emerald-700 shadow-sm flex justify-center items-center">
-                                    <DollarSign className="w-4 h-4 mr-1" /> Record Payment
-                                </button>
-                            </form>
+                            </div>
                         </div>
                     </div>
                 </div>

@@ -186,6 +186,15 @@ const StudentDashboard = () => {
                         <p className="font-bold text-gray-800 text-lg capitalize">{profile?.entry}</p>
                     </div>
                 </div>
+                {profile?.transportOpted && profile?.transportRoute && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 w-full">
+                        <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Transport Route</p>
+                        <p className="font-bold text-gray-800 text-lg flex items-center">
+                            <Bus className="w-4 h-4 mr-2 text-indigo-500" />
+                            {profile.transportRoute}
+                        </p>
+                    </div>
+                )}
             </div>
 
             {/* Fee Details Tabs Section */}
@@ -391,7 +400,9 @@ const StudentDashboard = () => {
                                 })}
                                 {feeTab !== 'library' && (!profile?.feeRecords || profile.feeRecords.filter(r => r.year === activeFeeYear && r.feeType === feeTab).length === 0) && (
                                     <div className="col-span-full text-center py-8 text-gray-400 text-sm bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                                        No {feeTab} fee records for Year {activeFeeYear}
+                                        No {feeTab} fee records for Year {activeFeeYear}.
+                                        <br />
+                                        <span className="text-xs text-gray-400">If you have recently been promoted, fees may not be configured yet.</span>
                                     </div>
                                 )}
                             </div>

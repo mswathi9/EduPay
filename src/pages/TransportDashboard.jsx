@@ -59,7 +59,8 @@ const TransportDashboard = () => {
                             <h3 className="text-lg font-bold text-gray-800">{searchedStudent.usn}</h3>
                             <p className="text-gray-500 text-sm">{searchedStudent.user?.name}</p>
                         </div>
-                        <div className="flex items-center space-x-2">
+                        <div className="flex items-center space-x-4">
+                            <span className="text-sm font-semibold text-gray-700 bg-white px-3 py-1 rounded border">Location: {searchedStudent.transportRoute || 'Not Assigned'}</span>
                             <span className="text-sm text-gray-500">Dept: {searchedStudent.department}</span>
                         </div>
                     </div>
@@ -140,9 +141,23 @@ const TransportDashboard = () => {
                                                             <div key={index} className="flex flex-col bg-gray-50 p-3 rounded-lg border border-gray-100">
                                                                 <div className="flex justify-between items-center mb-1">
                                                                     <span className="text-sm font-medium text-gray-600">Year {record.year} - Sem {record.semester}</span>
-                                                                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${record.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                                                        {record.status.toUpperCase()}
-                                                                    </span>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${record.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                            {record.status.toUpperCase()}
+                                                                        </span>
+                                                                        {record.status !== 'paid' && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    if (window.confirm(`Mark Semester ${record.semester} Transport Fee (₹${record.amountDue}) as PAID?`)) {
+                                                                                        handleUpdate({ markSemPaid: record.semester });
+                                                                                    }
+                                                                                }}
+                                                                                className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 transition font-semibold"
+                                                                            >
+                                                                                Mark Paid
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                                 <div className="flex justify-between text-xs text-gray-500">
                                                                     <span>Due: ₹{record.amountDue}</span>

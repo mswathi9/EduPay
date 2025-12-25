@@ -1,218 +1,174 @@
 import { useState } from 'react';
 import api from '../api/axios';
 import toast from 'react-hot-toast';
-import { Search, Briefcase, PlusCircle, CheckCircle, RefreshCw, DollarSign } from 'lucide-react';
+import { Briefcase, Search, UserCheck, DollarSign, CheckCircle } from 'lucide-react';
 
 const PlacementDashboard = () => {
-    // Bulk Assign State
-    const [assignedYear, setAssignedYear] = useState(1);
-    const [assignedAmount, setAssignedAmount] = useState('');
-    const [assigning, setAssigning] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [searchedStudent, setSearchedStudent] = useState(null);
 
-    // Individual Payment State
-    const [searchUsn, setSearchUsn] = useState('');
-    const [student, setStudent] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [payAmount, setPayAmount] = useState('');
-
-    const handleBulkAssign = async (e) => {
+    const handleSearchStudent = async (e) => {
         e.preventDefault();
-        setAssigning(true);
-        if (!assignedAmount || assignedAmount <= 0) {
-            toast.error('Invalid Amount');
-            setAssigning(false);
-            return;
-        }
-
         try {
-            const { data } = await api.post('/placement/fees/assign', {
-                year: Number(assignedYear),
-                amount: Number(assignedAmount)
-            });
-            toast.success(data.message);
-            setAssignedAmount('');
+            const { data } = await api.get(`/placement/students/search?query=${searchTerm}`);
+            setSearchedStudent(data);
         } catch (error) {
-            toast.error(error.response?.data?.message || 'Failed to assign fee');
-        } finally {
-            setAssigning(false);
+            toast.error('Student not found');
+            setSearchedStudent(null);
         }
     };
 
-    const handleSearch = async (e) => {
-        e.preventDefault();
-        setLoading(true);
-        setStudent(null);
-        setPayAmount('');
+    const handleUpdate = async (updates) => {
         try {
-            // Reusing admin search or just library search logic? 
-            // We need to fetch full student data to see placement fees.
-            // Since we don't have a direct "get student by usn" for placement, let's just use the `searchStudent` from admin if accessible (adminRoutes)
-            // BUT placement_officer doesn't have access to /admin routes by default in strict mode.
-            // Let's rely on the `markFeePaid` to return updated student or fail. 
-            // Ah, wait, we need to SEE the dues first.
-            // I should probably add a `getStudent` route for placement or just reuse `library/student/:usn` logic but expanded.
-
-            // For now, I will assume I can't easily SEARCH without a route.
-            // Let's just create a quick "Get Student Status" helper in placement routes?
-            // Actually, let's just stick to the task: "create a page to add and mark as paid".
-            // I'll assume the Payment Logic in backend (placementController) returns the current status if I query it?
-            // No, `markFeePaid` is POST.
-            // Let's just hit a generic "Get Stats" effectively? No.
-
-            // Hack: I'll try to use the library endpoint since I have access to it? 
-            // No placement officer is not authorized for library routes.
-            // I will blindly add the Payment Form based on USN input since "Search" wasn't explicitly demanded for *viewing*, but "Search to mark paid" implies it.
-            // I'll trust the process.
-
-            // Wait, I can just try to "Search" and if I get error handle it.
-            // Let's implement valid search logic if I can.
-            // I'll assume I can just enter USN and Amount to Pay blindly for now to satisfy the "Mark as Paid" requirement.
-
-            // A better UX is needed. Let's add a GET route for single student stats in placementController?
-            // I didn't add it in the step before. 
-            // Limit: I won't display student details before payment to keep it simple as per instructions "create a page to add and mark as paid".
-            // I will simulate "Found" state visually after first successful interaction or just show the form.
-            setStudent({ usn: searchUsn }); // Artificial found state
-
+            const { data } = await api.put(`/placement/students/${searchedStudent.usn}`, updates);
+            setSearchedStudent(data);
+            toast.success('Placement Details Updated');
         } catch (error) {
-            // ...
-        } finally {
-            setLoading(false);
+            toast.error('Update Failed');
         }
     };
-
-    const handlePayFee = async (e) => {
-        e.preventDefault();
-        if (!payAmount) return;
-
-        try {
-            const { data } = await api.post('/placement/fees/pay', {
-                usn: searchUsn,
-                amount: payAmount,
-                mode: 'CASH'
-            });
-            toast.success('Payment Recorded Successfully');
-            setStudent(null); // Reset
-            setSearchUsn('');
-            setPayAmount('');
-        } catch (error) {
-            toast.error(error.response?.data?.message || 'Payment Record Failed');
-        }
-    }
 
     return (
-        <div className="max-w-6xl mx-auto px-4 py-8 space-y-8">
-            <h1 className="text-3xl font-serif font-bold text-gray-900 flex items-center">
-                <Briefcase className="mr-3 h-8 w-8 text-brand-600" />
-                Planning and Placement Department
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <h1 className="text-3xl font-bold text-gray-900 mb-8 flex items-center">
+                <Briefcase className="mr-3 h-8 w-8 text-indigo-600" />
+                Placement Department
             </h1>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Bulk Assign Section */}
-                <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                        <PlusCircle className="mr-2 h-5 w-5 text-brand-600" />
-                        Assign Bulk Placement Fee
-                    </h2>
-                    <p className="text-sm text-gray-500 mb-6">Assign a uniform placement training fee to all students of a specific year. This applies to both quotas.</p>
-
-                    <form onSubmit={handleBulkAssign} className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Select Year</label>
-                            <div className="flex space-x-2">
-                                {[1, 2, 3, 4].map(y => (
-                                    <button
-                                        key={y}
-                                        type="button"
-                                        onClick={() => setAssignedYear(y)}
-                                        className={`flex-1 py-2 rounded-lg font-bold border transition-colors ${assignedYear === y ? 'bg-brand-600 text-white border-brand-600' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}
-                                    >
-                                        Year {y}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Fee Amount (₹)</label>
-                            <input
-                                type="number"
-                                required
-                                min="0"
-                                value={assignedAmount}
-                                onChange={e => setAssignedAmount(e.target.value)}
-                                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-500 outline-none"
-                                placeholder="e.g. 5000"
-                            />
-                        </div>
-                        <button
-                            type="submit"
-                            disabled={assigning}
-                            className="w-full py-3 bg-brand-700 text-white font-bold rounded-lg hover:bg-brand-800 transition-colors shadow-md flex justify-center items-center"
-                        >
-                            {assigning ? <RefreshCw className="animate-spin h-5 w-5" /> : 'Assign Fee to Batch'}
-                        </button>
-                    </form>
-                </div>
-
-                {/* Mark Paid Section */}
-                <div className="bg-white rounded-xl shadow-md border border-gray-200 p-6">
-                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
-                        <DollarSign className="mr-2 h-5 w-5 text-emerald-600" />
-                        Collect / Update Fee
-                    </h2>
-                    <p className="text-sm text-gray-500 mb-6">Manually record payment for a specific student for the current year.</p>
-
-                    <form onSubmit={student ? handlePayFee : handleSearch} className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Student USN</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
-                                <input
-                                    type="text"
-                                    required
-                                    value={searchUsn}
-                                    onChange={e => setSearchUsn(e.target.value.toUpperCase())}
-                                    disabled={!!student}
-                                    className="w-full pl-9 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none uppercase"
-                                    placeholder="Enter USN"
-                                />
-                                {student && (
-                                    <button
-                                        type="button"
-                                        onClick={() => { setStudent(null); setSearchUsn(''); }}
-                                        className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-red-500 font-bold hover:underline"
-                                    >
-                                        CHANGE
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-
-                        {student && (
-                            <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Payment Amount (₹)</label>
-                                <input
-                                    type="number"
-                                    required
-                                    min="1"
-                                    value={payAmount}
-                                    onChange={e => setPayAmount(e.target.value)}
-                                    className="w-full px-4 py-2 border border-emerald-300 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-emerald-50/50"
-                                    placeholder="Amount Collected"
-                                />
-                                <p className="text-xs text-gray-400 mt-1 italic">Note: This will be deducted from pending dues.</p>
-                            </div>
-                        )}
-
-                        <button
-                            type="submit"
-                            className={`w-full py-3 font-bold rounded-lg transition-colors shadow-md flex justify-center items-center ${student ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-gray-800 text-white hover:bg-gray-900'}`}
-                        >
-                            {student ? 'Confirm Payment' : 'Proceed to Pay'}
-                        </button>
-                    </form>
-                </div>
+            {/* Search Section */}
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 max-w-2xl mb-8">
+                <form onSubmit={handleSearchStudent} className="flex gap-4">
+                    <input
+                        type="text"
+                        placeholder="Enter Student USN / Roll Number"
+                        className="flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center">
+                        <Search className="w-4 h-4 mr-2" /> Search
+                    </button>
+                </form>
             </div>
+
+            {/* Student Details Section */}
+            {searchedStudent && (
+                <div className="bg-white rounded-xl shadow-md overflow-hidden max-w-4xl border border-gray-200">
+                    <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+                        <div>
+                            <h3 className="text-lg font-bold text-gray-800">{searchedStudent.usn}</h3>
+                            <p className="text-gray-500 text-sm">{searchedStudent.user?.name}</p>
+                        </div>
+                        <div className="flex items-center space-x-4">
+                            <span className="text-sm text-gray-500">Dept: {searchedStudent.department}</span>
+                        </div>
+                    </div>
+
+                    <div className="p-8">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                            {/* 1. Facilitiy Toggle */}
+                            <div className="p-6 bg-indigo-50 rounded-xl border border-indigo-100 flex flex-col justify-between">
+                                <div>
+                                    <h4 className="text-lg font-bold text-indigo-900 mb-2 flex items-center">
+                                        <UserCheck className="w-5 h-5 mr-2" />
+                                        Placement Training
+                                    </h4>
+                                    <p className="text-indigo-700 text-sm mb-4">
+                                        Current Status: <span className="font-bold">{searchedStudent.placementOpted ? 'ENABLED' : 'DISABLED'}</span>
+                                    </p>
+                                </div>
+                                {/* Note: Placement Opted toggle logic can be added here if needed, but usually handled by Registrar */}
+                            </div>
+
+                            {/* 2. Fee Management */}
+                            <div className={`p-6 rounded-xl border flex flex-col justify-between ${searchedStudent.placementOpted ? 'bg-white border-gray-200' : 'bg-gray-100 border-gray-200 opacity-75'}`}>
+                                <div>
+                                    <h4 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
+                                        <DollarSign className="w-5 h-5 mr-2" />
+                                        Fee Management
+                                    </h4>
+
+                                    {searchedStudent.placementOpted ? (
+                                        <div className="space-y-4">
+                                            <div className="bg-gray-50 p-4 rounded-lg">
+                                                <p className="text-sm text-gray-500 mb-1">Current Placement Fee Due</p>
+                                                <p className="text-2xl font-bold text-gray-900">₹{searchedStudent.placementFeeDue}</p>
+                                            </div>
+
+                                            {searchedStudent.placementFeeDue > 0 ? (
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm(`Mark ₹${searchedStudent.placementFeeDue} as PAID?`)) {
+                                                            handleUpdate({ placementFeeDue: 0 });
+                                                        }
+                                                    }}
+                                                    className="w-full py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition shadow-sm flex justify-center items-center"
+                                                >
+                                                    <DollarSign className="w-5 h-5 mr-2" />
+                                                    Mark Full Year Paid
+                                                </button>
+                                            ) : (
+                                                <div className="w-full py-3 bg-green-100 text-green-800 font-bold rounded-lg flex justify-center items-center">
+                                                    <CheckCircle className="w-5 h-5 mr-2" />
+                                                    Full Year Paid
+                                                </div>
+                                            )}
+
+                                            {/* Semester Wise Breakdown */}
+                                            <div className="mt-6 border-t border-gray-200 pt-4">
+                                                <h5 className="font-semibold text-gray-700 mb-2">Semester Breakdown</h5>
+                                                <div className="space-y-3">
+                                                    {searchedStudent.feeRecords && searchedStudent.feeRecords
+                                                        .filter(r => r.feeType === 'placement')
+                                                        .sort((a, b) => a.year - b.year || a.semester - b.semester)
+                                                        .map((record, index) => (
+                                                            <div key={index} className="flex flex-col bg-gray-50 p-3 rounded-lg border border-gray-100">
+                                                                <div className="flex justify-between items-center mb-1">
+                                                                    <span className="text-sm font-medium text-gray-600">Year {record.year} - Sem {record.semester}</span>
+                                                                    <div className="flex items-center space-x-2">
+                                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${record.status === 'paid' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                                            {record.status.toUpperCase()}
+                                                                        </span>
+                                                                        {record.status !== 'paid' && (
+                                                                            <button
+                                                                                onClick={() => {
+                                                                                    if (window.confirm(`Mark Semester ${record.semester} Placement Fee (₹${record.amountDue}) as PAID?`)) {
+                                                                                        handleUpdate({ markSemPaid: record.semester });
+                                                                                    }
+                                                                                }}
+                                                                                className="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200 transition font-semibold"
+                                                                            >
+                                                                                Mark Paid
+                                                                            </button>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div className="flex justify-between text-xs text-gray-500">
+                                                                    <span>Due: ₹{record.amountDue}</span>
+                                                                    <span>Paid: ₹{record.amountPaid}</span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-200 rounded-full h-1 mt-1">
+                                                                    <div
+                                                                        className={`h-1 rounded-full ${record.status === 'paid' ? 'bg-green-500' : 'bg-indigo-500'}`}
+                                                                        style={{ width: `${Math.min(100, (record.amountPaid / record.amountDue) * 100)}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 text-gray-500">
+                                            Placement Training not opted.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
